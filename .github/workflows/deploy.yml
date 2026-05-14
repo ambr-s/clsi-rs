@@ -1,0 +1,48 @@
+# On push to ambersys/main: build the container image + deploy the worker.
+# wrangler handles both — builds via the local Docker daemon on the runner,
+# pushes to CF's container registry, then deploys the Worker that binds to
+# it.
+#
+# Secrets that need to exist in the worker (CLSI_SHARED_AUTH, R2_*) are
+# managed out-of-band via `wrangler secret put` — they're not in wrangler.jsonc
+# and persist across deploys.
+#
+# Required repo secrets:
+#   CLOUDFLARE_API_TOKEN  — token from CF dashboard with Workers + Containers + R2 scopes
+#   CLOUDFLARE_ACCOUNT_ID — account id from dashboard URL / `wrangler whoami`
+
+name: deploy
+
+on:
+  push:
+    branches:
+      - ambersys/main
+  workflow_dispatch:
+
+# Serialize deploys so we don't push competing images.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install wrangler deps
+        run: npm ci
+
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy

@@ -1,0 +1,82 @@
+# Example docker-compose for running an Overleaf CE instance backed by
+# clsi-rs on Cloudflare Containers.
+#
+# This is a sanitized version of a real production deploy. Copy + adapt:
+#  - `image:` for sharelatex pulls our forked CE that knows about R2 + clsi-rs
+#    (built by .github/workflows/server-ce.yml in ambr-s/overleaf).
+#  - `clsi-proxy` is the tiny nginx that adds the CLSI bearer header before
+#    forwarding to the Cloudflare Worker (see ../README.md for the full path).
+#  - Secrets live in variables.env (filestore + history-v1 S3 creds, SMTP,
+#    etc.) and the compose-level .env (CLSI_SHARED_AUTH, CLSI_CF_HOST).
+#    Copy variables.env.example -> variables.env and fill in.
+#
+# Required public-facing ingress: an HTTPS proxy in front of port 8080
+# (here we expose it on 127.0.0.1 and front it with openresty on the host).
+
+name: overleaf
+
+services:
+  sharelatex:
+    # Build via GHA (see ambr-s/overleaf/.github/workflows/server-ce.yml).
+    # Pin the tag to a specific shortsha in production; "ambersys-clsi-rs-r2"
+    # is the branch tag and auto-updates on each push.
+    image: ghcr.io/ambr-s/overleaf:ambersys-clsi-rs-r2
+    container_name: sharelatex
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:80"   # front with TLS/openresty on the host
+    environment:
+      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+      OVERLEAF_REDIS_HOST: redis
+      REDIS_HOST: redis
+      GIT_BRIDGE_ENABLED: "false"
+    env_file:
+      - variables.env
+    volumes:
+      - ./data/overleaf:/var/lib/overleaf
+
+  mongo:
+    image: mongo:8.0
+    container_name: mongo
+    restart: unless-stopped
+    command: ["--replSet", "overleaf"]
+    expose: ["27017"]
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'db.stats().ok' | mongosh localhost:27017/test --quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./data/mongo:/data/db
+      - mongo-configdb:/data/configdb
+
+  redis:
+    image: redis:7.4
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    expose: ["6379"]
+    volumes:
+      - ./data/redis:/data
+
+  # Bearer-injecting passthrough to the clsi-rs CF Worker.
+  # CE web is configured (via CLSI_HOST=clsi-proxy in variables.env) to send
+  # all CLSI calls here instead of the bundled local CLSI.
+  clsi-proxy:
+    image: nginx:1.27-alpine
+    container_name: clsi-proxy
+    restart: unless-stopped
+    environment:
+      CLSI_SHARED_AUTH: ${CLSI_SHARED_AUTH}
+      CLSI_CF_HOST: ${CLSI_CF_HOST}
+    volumes:
+      - ./clsi-proxy.conf.tpl:/etc/nginx/templates/default.conf.template:ro
+    expose: ["3013"]
+
+volumes:
+  mongo-configdb:
