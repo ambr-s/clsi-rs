@@ -8,7 +8,6 @@
 //   GET /health_check, /status                    — liveness
 //
 // What we deliberately skip vs upstream CE:
-//   - sync/code, sync/pdf (SyncTeX) — not required for compile
 //   - wordcount — separate endpoint, web only hits it on button click
 //   - compile/stop — best-effort cancel, not load-bearing
 //   - clsi-cache, content-cache, ranges/contentId — CE-internal optimizations
@@ -33,6 +32,7 @@ mod compile;
 mod errors;
 mod lock;
 mod r2;
+mod sync;
 mod types;
 
 pub struct AppState {
@@ -97,6 +97,17 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/project/:pid", delete(clear_project_no_user))
         .route("/project/:pid/user/:uid", delete(clear_project_with_user))
+        // SyncTeX: forward (editor → PDF) and reverse (PDF → editor).
+        .route("/project/:pid/sync/code", get(sync::sync_code_no_user))
+        .route(
+            "/project/:pid/user/:uid/sync/code",
+            get(sync::sync_code_with_user),
+        )
+        .route("/project/:pid/sync/pdf", get(sync::sync_pdf_no_user))
+        .route(
+            "/project/:pid/user/:uid/sync/pdf",
+            get(sync::sync_pdf_with_user),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
