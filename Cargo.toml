@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-axum = { version = "0.7", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
+axum = { version = "0.7", default-features = false, features = ["http1", "json", "matched-path", "tokio", "query"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "fs", "sync", "signal", "time"] }
 tower = { version = "0.5", default-features = false }
 serde = { version = "1", features = ["derive"] }
