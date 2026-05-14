@@ -32,7 +32,12 @@ RUN apt-get update \
         texlive-xetex \
         texlive-luatex \
         biber \
- && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+ && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+ # Rebuild the TeX filename database so kpsewhich can find files in packages
+ # installed after texlive-base (e.g. scrartcl.cls from koma-script in
+ # texlive-latex-recommended). Without this, pdflatex reports "file not found"
+ # for things that are physically present on disk.
+ && mktexlsr
 
 # Non-root user — CF Containers run unprivileged; fly/Modal happy with it too.
 RUN useradd -u "$UID" -m -s /usr/sbin/nologin clsi \
