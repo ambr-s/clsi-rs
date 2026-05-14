@@ -90,6 +90,11 @@ async fn main() -> anyhow::Result<()> {
     // on platforms where we're directly exposed to public bot traffic.
     let private = Router::new()
         .route("/project/:pid/status", get(project_status))
+        // Per-user variant used as a warmup probe — web fires a fire-and-forget
+        // GET here when a user opens a project so the container is hot before
+        // the first Recompile click. Worker routes by user_id so it lands on
+        // the right DO.
+        .route("/project/:pid/user/:uid/status", get(project_status_user))
         .route("/project/:pid/compile", post(compile::compile_no_user))
         .route(
             "/project/:pid/user/:uid/compile",
@@ -128,6 +133,12 @@ async fn health() -> &'static str {
 }
 
 async fn project_status(AxumPath(_pid): AxumPath<String>) -> &'static str {
+    "OK"
+}
+
+async fn project_status_user(
+    AxumPath((_pid, _uid)): AxumPath<(String, String)>,
+) -> &'static str {
     "OK"
 }
 

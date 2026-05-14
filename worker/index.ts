@@ -22,7 +22,7 @@ export class ClsiContainer extends Container<Env> {
   requiredPorts = [3013];
   // Keeps the container alive across an active editing session. Cost: 8 GiB
   // memory provisioned for 2min after every burst.
-  sleepAfter = "2m";
+  sleepAfter = "5m";
   enableInternet = true;
 
   override async fetch(request: Request): Promise<Response> {
