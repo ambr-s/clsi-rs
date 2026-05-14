@@ -29,7 +29,9 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Blacksmith runner (configured org-level). 2 vCPU is enough for the rust
+    # compile + wrangler push; tier up if waiting on builds starts to bug you.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
