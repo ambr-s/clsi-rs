@@ -288,9 +288,19 @@ fn parse_synctex_code(stdout: &str, work_dir: &std::path::Path) -> Vec<CodePosit
     out
 }
 
-// synctex reports input paths relative to the .tex file's location. Strip the
-// "./" prefix that latexmk sometimes adds; otherwise leave the path as-is —
-// web prefixes the project root itself.
-fn rel_to_work(path: &str, _work_dir: &std::path::Path) -> String {
-    path.strip_prefix("./").unwrap_or(path).to_owned()
+// Convert synctex's Input: value (which can be absolute, e.g.
+// "/work/<scope>/main.tex", or relative like "./main.tex" or "main.tex")
+// into a project-relative path that matches a file in the user's project
+// tree.
+fn rel_to_work(path: &str, work_dir: &std::path::Path) -> String {
+    // Try stripping the work dir prefix (with and without trailing slash).
+    let work_str = work_dir.to_string_lossy();
+    if let Some(rest) = path.strip_prefix(work_str.as_ref()) {
+        return rest.trim_start_matches('/').to_owned();
+    }
+    // Some latexmk configurations record paths like "./main.tex".
+    if let Some(rest) = path.strip_prefix("./") {
+        return rest.to_owned();
+    }
+    path.to_owned()
 }
