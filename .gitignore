@@ -1,0 +1,17 @@
+# Rust build artifacts
+target/
+
+# Node / wrangler
+node_modules/
+.wrangler/
+
+# Local secrets (per-deployment, set via wrangler secret put)
+.shared-auth
+.env
+.env.local
+
+# IDE / OS junk
+.idea/
+.vscode/
+.DS_Store
+*.swp

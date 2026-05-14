@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clsi-amber-cf",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "containers": [
+    {
+      "class_name": "ClsiContainer",
+      "image": "./Dockerfile",
+      // Custom instance: 1 vCPU (pdflatex is single-threaded so 2nd vCPU was
+      // wasted), 2 GiB memory (normal LaTeX peaks ~500MB), 10 GB disk
+      // (our extracted image is ~5GB, leaves headroom for /work). Saves cost
+      // vs standard-3 with no compile-speed penalty.
+      // CF requires ≥3 GiB RAM per vCPU and disk ≤2× RAM. With 1 vCPU the
+      // floor is 3 GiB / 6 GB disk. Using 4 GiB / 8 GB to give /work some
+      // headroom while still being well under standard-3's footprint.
+      "instance_type": { "vcpu": 1, "memory_mib": 4096, "disk_mb": 8000 },
+      // Safety ceiling, not a scaling target. With per-user routing we expect
+      // ≤10 active concurrent users; 15 leaves headroom + acts as a circuit
+      // breaker if auth leaks or a bug spawns container-per-request.
+      "max_instances": 15
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "CLSI", "class_name": "ClsiContainer" }]
+  },
+  // R2 binding for the output bucket. Worker serves PDF/log/etc. directly from
+  // R2 on GET, bypassing the container — much faster (no DO RPC hop) and the
+  // container can sleep while output files remain fetchable.
+  "r2_buckets": [
+    { "binding": "OUTPUTS", "bucket_name": "overleaf-clsi-output-eu" }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ClsiContainer"]
+    }
+  ]
+}
