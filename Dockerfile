@@ -26,6 +26,7 @@ RUN apt-get update \
         texlive-latex-base \
         texlive-latex-recommended \
         texlive-latex-extra \
+        texlive-publishers \
         texlive-fonts-recommended \
         texlive-science \
         texlive-bibtex-extra \
